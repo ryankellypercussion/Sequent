@@ -27,8 +27,7 @@ view model =
         , Atom "A"
         ]
       , [ Atom "B"
-        , Neg (Atom "C")
-        , Atom "D"
+        , Impl (Atom "C") (Compl (Atom "A") (Atom "D"))
         ]
       )
   in
@@ -47,6 +46,7 @@ type Formula
   | Conj Formula Formula
   | Disj Formula Formula
   | Impl Formula Formula
+  | Compl Formula Formula
 
 formulaToString f =
   case f of
@@ -55,6 +55,7 @@ formulaToString f =
      Conj a b -> formulaToString a ++ " ∧ " ++ formulaToString b
      Disj a b -> formulaToString a ++ " ∨ " ++ formulaToString b
      Impl a b -> formulaToString a ++ " → " ++ formulaToString b
+     Compl a b -> formulaToString a ++ " ∖ " ++ formulaToString b
 
 isAtom f =
   case f of
@@ -79,6 +80,11 @@ isImpl f =
 isNeg f =
   case f of
     Neg _ -> True
+    _ -> False
+
+isCompl f =
+  case f of
+    Compl _ _ -> True
     _ -> False
 
 type alias Sequent = (List Formula, List Formula)
@@ -137,17 +143,71 @@ extractFirst condition cedent =
 
 testRules : List Rule
 testRules =
-  [ Rule "LNot" 
+  [ Rule "LNeg" 
       <| \(ant, suc) ->
         case extractFirst isNeg ant of
           Just (Neg f, rest) ->
               Just (Object (rest, List.append suc [f]))
           _ -> Nothing
-  , Rule "RNot"
+  , Rule "RNeg"
       <| \(ant, suc) ->
         case extractFirst isNeg suc of
           Just (Neg f, rest) ->
             Just (Object (List.append ant [f], rest))
+          _ -> Nothing
+  , Rule "LConj"
+      <| \(ant, suc) ->
+        case extractFirst isConj ant of
+          Just (Conj a b, rest) ->
+            Just (Sum (Object (List.append rest [a], suc))
+                      (Object (List.append rest [b], suc)))
+          _ -> Nothing
+  , Rule "RConj"
+      <| \(ant, suc) ->
+        case extractFirst isConj suc of
+          Just (Conj a b, rest) ->
+            Just (Product (Object (ant, List.append rest [a]))
+                          (Object (ant, List.append rest [b])))
+          _ -> Nothing
+  , Rule "LDisj"
+      <| \(ant, suc) ->
+        case extractFirst isDisj ant of
+          Just (Disj a b, rest) ->
+            Just (Product (Object (List.append rest [a], suc))
+                          (Object (List.append rest [b], suc)))
+          _ -> Nothing
+  , Rule "RDisj"
+      <| \(ant, suc) ->
+        case extractFirst isDisj suc of
+          Just (Disj a b, rest) ->
+            Just (Sum (Object (ant, List.append rest [a]))
+                      (Object (ant, List.append rest [b])))
+          _ -> Nothing
+  , Rule "LImpl"
+      <| \(ant, suc) ->
+        case extractFirst isImpl ant of
+          Just (Impl a b, rest) ->
+            Just (Product (Object (rest, [a]))
+                      (Object ([b], suc)))
+          _ -> Nothing
+  , Rule "RImpl"
+      <| \(ant, suc) ->
+        case extractFirst isImpl suc of
+          Just (Impl a b, rest) ->
+            Just (Object (List.append ant [a], List.append rest [b]))
+          _ -> Nothing
+  , Rule "LCompl"
+      <| \(ant, suc) ->
+        case extractFirst isCompl ant of
+          Just (Compl a b, rest) ->
+            Just (Object (List.append rest [a], List.append suc [b]))
+          _ -> Nothing
+  , Rule "RCompl"
+      <| \(ant, suc) ->
+        case extractFirst isCompl suc of
+          Just (Compl a b, rest) ->
+            Just (Sum (Object (ant, [a]))
+                      (Object ([b], rest)))
           _ -> Nothing
   ]
 
@@ -179,9 +239,9 @@ proofSearch rules proof =
 printProof : Proof -> Html Msg
 printProof proof =
   case proof of
-     Object sequent -> div [] [ text <| sequentToString sequent ]
-     Arrow a r b -> div [] [ div [] [ text <| sequentToString a ], div [] [ text r ], div [] [ printProof b] ]
+     Object sequent -> div [ class "sequent" ] [ text <| sequentToString sequent ]
+     Arrow a r b -> div [ class "arrow" ] [ div [] [ text <| sequentToString a ], div [] [ text r ], printProof b ]
      FibredSum _ -> div [] []
      FibredProduct _ -> div [] []
-     Sum _ _ -> div [] []
-     Product _ _ -> div [] []
+     Sum a b -> div [ class "sum" ] [ printProof a , printProof b ]
+     Product a b -> div [ class "product"] [ printProof a, printProof b ]
