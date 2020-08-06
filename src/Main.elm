@@ -1,9 +1,11 @@
 module Main exposing (main)
 
 import Browser
-import Html exposing (Html, button, div, text)
-import Html.Events exposing (onClick)
-import Html.Attributes exposing (class)
+import Css exposing (..)
+import Html
+import Html.Styled exposing (..)
+import Html.Styled.Events exposing (onClick)
+import Html.Styled.Attributes exposing (css, class)
 
 type alias Model =
   {}
@@ -16,7 +18,7 @@ main =
     { init = \_ -> ({}, Cmd.none)
     , update = \_  model -> (model, Cmd.none)
     , subscriptions = \_ -> Sub.none
-    , view = view
+    , view = view >> toUnstyled
     }
 
 view : Model -> Html Msg
@@ -24,18 +26,15 @@ view model =
   let
     sequent =
       ( [ Impl (Atom "A") (Atom "B")
-        , Atom "A"
+        , Impl (Disj (Atom "A") (Neg (Atom "C"))) (Atom "D")
         ]
       , [ Atom "B"
-        , Impl (Atom "C") (Compl (Atom "A") (Atom "D"))
+        , Impl (Atom "C") (Compl (Neg (Atom "A")) (Conj (Atom "C") (Atom "D")))
         ]
       )
   in
   div []
-    [ sequent
-        |> sequentToString
-        |> Html.text
-    , Object sequent
+    [ Object sequent
         |> proofSearch testRules
         |> printProof
     ]
@@ -236,12 +235,73 @@ proofSearch rules proof =
     Arrow p i q ->
       Arrow p i (proofSearch rules q)
 
+
 printProof : Proof -> Html Msg
 printProof proof =
+  let
+    object sequent =
+      div
+        [ class "sequent"
+        , css
+          [ flexGrow (num 1)
+          , flexShrink (num 0)
+          , flexBasis auto
+          , textAlign center
+          , margin2 (Css.em 0.5) auto
+          ]
+        ]
+        [ text <| sequentToString sequent ]
+
+    arrow a r b =
+      div
+        [ class "arrow"
+        , css
+          [ flexGrow (num 2)
+          , flexShrink (num 0)
+          , flexBasis auto
+          ]
+        ]
+        [ object a
+        , div
+          [ css
+            [ after
+              [ display inlineBlock
+              , height (Css.em 0.5)
+              , width (pct 100)
+              , marginLeft (Css.em 0.25)
+              , marginRight (pct -100)
+              , property "content" "''"
+              , borderTop3 (px 1) solid (rgb 0 0 0)
+              , verticalAlign bottom
+              ]
+            , overflow hidden
+            , fontStyle italic
+            , fontSize (Css.em 0.8)
+            ]
+          ]
+          [ text r ]
+        , printProof b
+        ]
+
+    product s a b =
+      div
+        [ class "product"
+        , css
+          [ displayFlex
+          , flex2 (num 1) (num 0)
+          , flexBasis auto
+          , justifyContent spaceBetween
+          ]
+        ]
+        [ printProof a
+        , div [ css [ flexShrink (num 0), flexBasis (Css.em 2), textAlign center, paddingTop (Css.em 0.5) ] ] [ text s ]
+        , printProof b
+        ]
+  in
   case proof of
-     Object sequent -> div [ class "sequent" ] [ text <| sequentToString sequent ]
-     Arrow a r b -> div [ class "arrow" ] [ div [] [ text <| sequentToString a ], div [] [ text r ], printProof b ]
+     Object sequent -> object sequent
+     Arrow a r b -> arrow a r b
      FibredSum _ -> div [] []
      FibredProduct _ -> div [] []
-     Sum a b -> div [ class "sum" ] [ printProof a , printProof b ]
-     Product a b -> div [ class "product"] [ printProof a, printProof b ]
+     Sum a b -> product "+" a b
+     Product a b -> product "⨯" a b
