@@ -1,4 +1,4 @@
-module Main exposing (main)
+module Main exposing (main, isNeg)
 
 import Browser
 import Css exposing (..)
@@ -22,7 +22,7 @@ main =
     }
 
 view : Model -> Html Msg
-view model =
+view _ =
   let
     sequent =
       ( [ Impl (Atom "A") (Atom "B")
@@ -47,6 +47,7 @@ type Formula
   | Impl Formula Formula
   | Compl Formula Formula
 
+formulaToString : Formula -> String
 formulaToString f =
   case f of
      Atom s -> s
@@ -56,31 +57,31 @@ formulaToString f =
      Impl a b -> formulaToString a ++ " → " ++ formulaToString b
      Compl a b -> formulaToString a ++ " ∖ " ++ formulaToString b
 
-isAtom f =
-  case f of
-     Atom _ -> True
-     _ -> False
-
+isConj : Formula -> Bool
 isConj f =
   case f of
      Conj _ _ -> True
      _ -> False
 
+isDisj : Formula -> Bool
 isDisj f =
   case f of
     Disj _ _ -> True
     _ -> False
 
+isImpl : Formula -> Bool
 isImpl f =
   case f of
     Impl _ _ -> True
     _ -> False
 
+isNeg : Formula -> Bool
 isNeg f =
   case f of
     Neg _ -> True
     _ -> False
 
+isCompl : Formula -> Bool
 isCompl f =
   case f of
     Compl _ _ -> True
@@ -88,6 +89,7 @@ isCompl f =
 
 type alias Sequent = (List Formula, List Formula)
 
+sequentToString : Sequent -> String
 sequentToString s =
   let
     cedentToString c =
@@ -122,16 +124,6 @@ type Proof
   | Object Sequent
 
 type Rule = Rule String (Sequent -> Maybe Proof)
-
-ruleName : Rule -> String
-ruleName rule =
-  case rule of
-    Rule s _ -> s
-
-ruleFunction : Rule -> (Sequent -> Maybe Proof)
-ruleFunction rule =
-  case rule of
-    Rule _ r -> r
 
 extractFirst : (Formula -> Bool) -> List Formula -> Maybe (Formula, List Formula)
 extractFirst condition cedent =
